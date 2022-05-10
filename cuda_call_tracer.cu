@@ -32,6 +32,7 @@
 #include <stdlib.h>
 #include <unordered_set>
 #include <iostream>
+#include <map>
 #include <fstream>
 
 /* every tool needs to include this once */
@@ -57,6 +58,8 @@ uint64_t tot_memcpy_d2h = 0;
 /* Trace file pointer */
 FILE * traceFp;
 
+/* Hashmap to keep device pointer reference */
+std::map<CUdeviceptr, char*> *dptr_map;
 
 /* kernel instruction counter, updated by the GPU */
 __managed__ uint64_t counter = 0;
@@ -120,6 +123,9 @@ void nvbit_at_init() {
     // Init trace fp
     traceFp = fopen("cuda_calls.trace", "w");
 
+    // Init map
+    dptr_map = new std::map<CUdeviceptr, char*>();
+
     std::string pad(100, '-');
     printf("%s\n", pad.c_str());
 
@@ -139,12 +145,16 @@ void nvbit_at_cuda_event(CUcontext ctx, int is_exit, nvbit_api_cuda_t cbid,
     if (is_exit) {
         // Check memalloc result after it finishes
         // Deref as the argument is passed by addr
-        if (cbid == API_CUDA_cuMemAlloc) {
-            cuMemAlloc_params *p = (cuMemAlloc_params *)params;
-            fprintf(traceFp, "CUDA memalloc: dptr: %p, size: %d\n", *(p->dptr), p->bytesize);
-        } else if (cbid == API_CUDA_cuMemAlloc_v2) {
+        if (cbid == API_CUDA_cuMemAlloc || cbid == API_CUDA_cuMemAlloc_v2) {
             cuMemAlloc_v2_params *p = (cuMemAlloc_v2_params *)params;
-            fprintf(traceFp, "CUDA memalloc: dptr: %p, size: %d\n", *(p->dptr), p->bytesize);
+            uint64_t size = dptr_map->size();
+
+            // Assuming there will not be 10^24 device pointer exist
+            char *name = (char*)malloc(30);
+            sprintf(name, "dptr-%d", size);
+            dptr_map->insert({*(p->dptr), name});
+
+            fprintf(traceFp, "CUDA memalloc: dptr: %s, size: %d\n", name, p->bytesize);
         } else if (cbid == API_CUDA_cuMemcpyDtoH
             || cbid == API_CUDA_cuMemcpyDtoHAsync
             || cbid == API_CUDA_cuMemcpyDtoH_v2
@@ -153,7 +163,9 @@ void nvbit_at_cuda_event(CUcontext ctx, int is_exit, nvbit_api_cuda_t cbid,
             || cbid == API_CUDA_cuMemcpyDtoHAsync_v2_ptsz) {
             // Move to here as we need to save the data for verification purpose
             cuMemcpyDtoH_v2_params *p = (cuMemcpyDtoH_v2_params *) params;
-            fprintf(traceFp, "CUDA memcpyD2H detected: host_ptr: %p, device_ptr: %p, size: %ld\n", p->dstHost, p->srcDevice, p->ByteCount);
+            CUdeviceptr dptr = p->srcDevice;
+            char* name = dptr_map->find(dptr)->second;
+            fprintf(traceFp, "CUDA memcpyD2H detected: host_ptr: %p, device_ptr: %s, size: %ld\n", p->dstHost, name, p->ByteCount);
             
             // Dump src data (or dst here as we finished copy) to a file with name: cuMemcpyD2H-COUNT-SIZE.data
             char buf[200];
@@ -216,11 +228,17 @@ void nvbit_at_cuda_event(CUcontext ctx, int is_exit, nvbit_api_cuda_t cbid,
 
             // Parse on type and give type size
             if (type.compare("double*") == 0) {
-                fprintf(traceFp, "%p, %d, ", *(double **)(*tmp), sizeof(double*));
+                CUdeviceptr dptr = (CUdeviceptr) *(double **)(*tmp);
+                char* name = dptr_map->find(dptr)->second;
+                fprintf(traceFp, "%s, %d, ", name, sizeof(double*));
             } else if (type.compare("float*") == 0) {
-                fprintf(traceFp, "%p, %d, ", *(float **)(*tmp), sizeof(float*));
+                CUdeviceptr dptr = (CUdeviceptr) *(float **)(*tmp);
+                char* name = dptr_map->find(dptr)->second;
+                fprintf(traceFp, "%s, %d, ", name, sizeof(float*));
             } else if (type.compare("int*") == 0) {
-                fprintf(traceFp, "%p, %d, ", *(int **)(*tmp), sizeof(int*));
+                CUdeviceptr dptr = (CUdeviceptr) *(int **)(*tmp);
+                char* name = dptr_map->find(dptr)->second;
+                fprintf(traceFp, "%s, %d, ", name, sizeof(int*));
             } else if (type.compare("double") == 0) {
                 fprintf(traceFp, "%f, %d, ", *(double *)(*tmp), sizeof(double));
             } else if (type.compare("float") == 0) {
@@ -275,8 +293,10 @@ void nvbit_at_cuda_event(CUcontext ctx, int is_exit, nvbit_api_cuda_t cbid,
             || cbid == API_CUDA_cuMemcpyHtoDAsync_v2
             || cbid == API_CUDA_cuMemcpyHtoD_v2_ptds
             || cbid == API_CUDA_cuMemcpyHtoDAsync_v2_ptsz) {
-        cuMemcpyHtoD_params *p = (cuMemcpyHtoD_params *) params;
-        fprintf(traceFp, "CUDA memcpyH2D detected: device_ptr: %p, host_ptr: %p, size: %d\n", p->dstDevice, p->srcHost, p->ByteCount);
+        cuMemcpyHtoD_v2_params *p = (cuMemcpyHtoD_v2_params *) params;
+        CUdeviceptr dptr = p->dstDevice;
+        char* name = dptr_map->find(dptr)->second;
+        fprintf(traceFp, "CUDA memcpyH2D detected: device_ptr: %s, host_ptr: %p, size: %d\n", name, p->srcHost, p->ByteCount);
 
         // Dump src data to a file with name: cuMemcpyH2D-COUNT-SIZE.data
         char buf[200];
@@ -293,7 +313,9 @@ void nvbit_at_cuda_event(CUcontext ctx, int is_exit, nvbit_api_cuda_t cbid,
         tot_memcpy_h2d++;
     } else if (cbid == API_CUDA_cuMemFree || cbid == API_CUDA_cuMemFree_v2) {
         cuMemFree_v2_params *p = (cuMemFree_v2_params *) params;
-        fprintf(traceFp, "CUDA free detected: dptr: %p\n", p->dptr);
+        CUdeviceptr dptr = p->dptr;
+        char* name = dptr_map->find(dptr)->second;
+        fprintf(traceFp, "CUDA free detected: dptr: %s\n", name);
     }
 }
 
