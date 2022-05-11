@@ -165,7 +165,6 @@ void nvbit_at_cuda_event(CUcontext ctx, int is_exit, nvbit_api_cuda_t cbid,
             cuMemcpyDtoH_v2_params *p = (cuMemcpyDtoH_v2_params *) params;
             CUdeviceptr dptr = p->srcDevice;
             char* name = dptr_map->find(dptr)->second;
-            fprintf(traceFp, "CUDA memcpyD2H detected: host_ptr: %p, device_ptr: %s, size: %ld\n", p->dstHost, name, p->ByteCount);
             
             // Dump src data (or dst here as we finished copy) to a file with name: cuMemcpyD2H-COUNT-SIZE.data
             char buf[200];
@@ -180,6 +179,8 @@ void nvbit_at_cuda_event(CUcontext ctx, int is_exit, nvbit_api_cuda_t cbid,
             }
             
             tot_memcpy_d2h++;
+
+            fprintf(traceFp, "CUDA memcpyD2H detected: host_ptr: %p, device_ptr: %s, size: %ld, data_file: %s\n", p->dstHost, name, p->ByteCount, buf);
         }
         return;
     }
@@ -296,8 +297,7 @@ void nvbit_at_cuda_event(CUcontext ctx, int is_exit, nvbit_api_cuda_t cbid,
         cuMemcpyHtoD_v2_params *p = (cuMemcpyHtoD_v2_params *) params;
         CUdeviceptr dptr = p->dstDevice;
         char* name = dptr_map->find(dptr)->second;
-        fprintf(traceFp, "CUDA memcpyH2D detected: device_ptr: %s, host_ptr: %p, size: %d\n", name, p->srcHost, p->ByteCount);
-
+        
         // Dump src data to a file with name: cuMemcpyH2D-COUNT-SIZE.data
         char buf[200];
         sprintf(buf, "cuMemcpyH2D-%d-%d.data", tot_memcpy_h2d, p->ByteCount);
@@ -309,8 +309,10 @@ void nvbit_at_cuda_event(CUcontext ctx, int is_exit, nvbit_api_cuda_t cbid,
         } else {
             std::cerr << "Cannot open " << filename << std::endl;
         }
-    
+        
         tot_memcpy_h2d++;
+
+        fprintf(traceFp, "CUDA memcpyH2D detected: device_ptr: %s, host_ptr: %p, size: %d, data_file: %s\n", name, p->srcHost, p->ByteCount, buf);
     } else if (cbid == API_CUDA_cuMemFree || cbid == API_CUDA_cuMemFree_v2) {
         cuMemFree_v2_params *p = (cuMemFree_v2_params *) params;
         CUdeviceptr dptr = p->dptr;
