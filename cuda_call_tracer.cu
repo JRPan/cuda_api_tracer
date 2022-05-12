@@ -231,21 +231,21 @@ void nvbit_at_cuda_event(CUcontext ctx, int is_exit, nvbit_api_cuda_t cbid,
             if (type.compare("double*") == 0) {
                 CUdeviceptr dptr = (CUdeviceptr) *(double **)(*tmp);
                 char* name = dptr_map->find(dptr)->second;
-                fprintf(traceFp, "%s, %d, ", name, sizeof(double*));
+                fprintf(traceFp, "%s/%d/", name, sizeof(double*));
             } else if (type.compare("float*") == 0) {
                 CUdeviceptr dptr = (CUdeviceptr) *(float **)(*tmp);
                 char* name = dptr_map->find(dptr)->second;
-                fprintf(traceFp, "%s, %d, ", name, sizeof(float*));
+                fprintf(traceFp, "%s/%d/", name, sizeof(float*));
             } else if (type.compare("int*") == 0) {
                 CUdeviceptr dptr = (CUdeviceptr) *(int **)(*tmp);
                 char* name = dptr_map->find(dptr)->second;
-                fprintf(traceFp, "%s, %d, ", name, sizeof(int*));
+                fprintf(traceFp, "%s/%d/", name, sizeof(int*));
             } else if (type.compare("double") == 0) {
-                fprintf(traceFp, "%f, %d, ", *(double *)(*tmp), sizeof(double));
+                fprintf(traceFp, "%f/%d/", *(double *)(*tmp), sizeof(double));
             } else if (type.compare("float") == 0) {
-                fprintf(traceFp, "%f, %d, ", *(float *)(*tmp), sizeof(float));
+                fprintf(traceFp, "%f/%d/", *(float *)(*tmp), sizeof(float));
             } else if (type.compare("int") == 0) {
-                fprintf(traceFp, "%d, %d, ", *(int *)(*tmp), sizeof(int));
+                fprintf(traceFp, "%d/%d/", *(int *)(*tmp), sizeof(int));
             }
 
             // Increment the argument pointer
