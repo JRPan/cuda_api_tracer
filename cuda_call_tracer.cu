@@ -141,11 +141,11 @@ void nvbit_at_init() {
 void nvbit_at_cuda_event(CUcontext ctx, int is_exit, nvbit_api_cuda_t cbid,
                          const char *name, void *params, CUresult *pStatus) {
     /* Identify all the possible CUDA launch events */
-    // TODO Print out each call traces for other calls as well
     if (is_exit) {
         // Check memalloc result after it finishes
         // Deref as the argument is passed by addr
         if (cbid == API_CUDA_cuMemAlloc || cbid == API_CUDA_cuMemAlloc_v2) {
+            // TODO Use address instead of value to keep reference?
             cuMemAlloc_v2_params *p = (cuMemAlloc_v2_params *)params;
             uint64_t size = dptr_map->size();
 
