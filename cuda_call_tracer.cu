@@ -231,21 +231,31 @@ void nvbit_at_cuda_event(CUcontext ctx, int is_exit, nvbit_api_cuda_t cbid,
             if (type.compare("double*") == 0) {
                 CUdeviceptr dptr = (CUdeviceptr) *(double **)(*tmp);
                 char* name = dptr_map->find(dptr)->second;
-                fprintf(traceFp, "%s/%d/", name, sizeof(double*));
-            } else if (type.compare("float*") == 0) {
+                fprintf(traceFp, "%s/%lu/", name, sizeof(double*));
+            } else if (type.compare("float*") == 0 ||
+                    type.compare("float const*") == 0) {
                 CUdeviceptr dptr = (CUdeviceptr) *(float **)(*tmp);
                 char* name = dptr_map->find(dptr)->second;
-                fprintf(traceFp, "%s/%d/", name, sizeof(float*));
+                fprintf(traceFp, "%s/%lu/", name, sizeof(float*));
             } else if (type.compare("int*") == 0) {
                 CUdeviceptr dptr = (CUdeviceptr) *(int **)(*tmp);
                 char* name = dptr_map->find(dptr)->second;
-                fprintf(traceFp, "%s/%d/", name, sizeof(int*));
+                fprintf(traceFp, "%s/%lu/", name, sizeof(int*));
+            } else if (type.compare("unsigned char*") == 0 || 
+                        type.compare("unsigned char const*") == 0) {
+                CUdeviceptr dptr = (CUdeviceptr) *(unsigned char**)(*tmp);
+                char* name = dptr_map->find(dptr)->second;
+                fprintf(traceFp, "%s/%lu/", name, sizeof(unsigned char*));
             } else if (type.compare("double") == 0) {
-                fprintf(traceFp, "%f/%d/", *(double *)(*tmp), sizeof(double));
+                fprintf(traceFp, "%f/%lu/", *(double *)(*tmp), sizeof(double));
             } else if (type.compare("float") == 0) {
-                fprintf(traceFp, "%f/%d/", *(float *)(*tmp), sizeof(float));
+                fprintf(traceFp, "%f/%lu/", *(float *)(*tmp), sizeof(float));
             } else if (type.compare("int") == 0) {
-                fprintf(traceFp, "%d/%d/", *(int *)(*tmp), sizeof(int));
+                fprintf(traceFp, "%d/%lu/", *(int *)(*tmp), sizeof(int));
+            } else if (type.compare("unsigned int") == 0) {
+                fprintf(traceFp, "%u/%lu/", *(unsigned *)(*tmp), sizeof(unsigned));
+            } else if (type.compare("bool") == 0) {
+                fprintf(traceFp, "%s/%lu/", *(bool *)(*tmp)? "true" : "false", sizeof(bool));
             }
 
             // Increment the argument pointer
